@@ -9,23 +9,6 @@ const port = process.env.PORT || 3005;
 app.use(cors());
 app.use(express.json());
 
-// Configuração da conexão com o banco de dados MySQL
-const connection = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: 'Lan4z16@',
-  database: 'jurassic_db',
-  port: '3306'
-});
-
-connection.connect((err) => {
-  if (err) {
-    console.error('Erro ao conectar ao MySQL:', err);
-  } else {
-    console.log('Conectado ao MySQL');
-  }
-});
-
 // Usar bcrypt para gerar o hash da senha
 const saltRounds = 10;
 const mockUser = {
