@@ -2,8 +2,10 @@ const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
-
 const app = express();
+
+require('dotenv').config();
+
 
 app.use(cors());
 app.use(express.json());
@@ -25,8 +27,8 @@ async function createConnection() {
 
 // Usar bcrypt para gerar o hash da senha
 const mockUser = {
-  username: "TESTE",
-  password: "TESTE123"
+  username: process.env.USER,
+  password: process.env.PASSWORD
 };
 
 app.post("/api/login", async (req, res) => {
