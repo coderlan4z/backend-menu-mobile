@@ -1,48 +1,61 @@
 const express = require('express');
-const mysql = require('mysql2');
+const mysql = require('mysql2/promise');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 
 const app = express();
-const port = process.env.PORT || 3005;
 
 app.use(cors());
 app.use(express.json());
 
-// Usar bcrypt para gerar o hash da senha
 const saltRounds = 10;
+
+// Configurar conexão com o banco de dados usando variáveis de ambiente
+const dbConfig = {
+  host: process.env.DB_HOST,         // [AJUSTAR]
+  user: process.env.DB_USER,         // [AJUSTAR]
+  password: process.env.DB_PASSWORD, // [AJUSTAR]
+  database: process.env.DB_NAME,     // [AJUSTAR]
+};
+
+// Função para criar conexão com o banco de dados
+async function createConnection() {
+  return await mysql.createConnection(dbConfig);
+}
+
+// Usar bcrypt para gerar o hash da senha
 const mockUser = {
   username: "TESTE",
   password: "TESTE123"
 };
 
-bcrypt.hash(mockUser.password, saltRounds, (err, hash) => {
-  if (err) {
-    console.error('Erro ao gerar o hash da senha:', err);
-  } else {
-    mockUser.passwordHash = hash;
-  }
-});
-
-app.post("/api/login", (req, res) => {
+app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
 
   // Comparar a senha fornecida com o hash armazenado
-  bcrypt.compare(password, mockUser.passwordHash, (err, result) => {
-    if (err) {
-      console.error('Erro ao comparar senha e hash:', err);
-      res.status(500).json({ error: 'Erro ao comparar senha' });
-      return;
-    }
+  try {
+    const connection = await createConnection();
+    const [results] = await connection.execute('SELECT passwordHash FROM users WHERE username = ?', [username]);
+    const storedHash = results[0].passwordHash;
 
-    if (result) {
-      res.json({ success: true });
-    } else {
-      res.status(401).json({ success: false, error: "Unauthorized" });
-    }
-  });
+    bcrypt.compare(password, storedHash, (err, result) => {
+      if (err) {
+        console.error('Erro ao comparar senha e hash:', err);
+        res.status(500).json({ error: 'Erro ao comparar senha' });
+        return;
+      }
+
+      if (result) {
+        res.json({ success: true });
+      } else {
+        res.status(401).json({ success: false, error: "Unauthorized" });
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao conectar ao banco de dados:', error);
+    res.status(500).json({ error: 'Erro ao conectar ao banco de dados' });
+  }
 });
-
 // Rota para obter todos os produtos
 app.get('/api/produtos', (req, res) => {
   const query = 'SELECT * FROM products';
@@ -171,6 +184,7 @@ app.post('/api/categorias-add', (req, res) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`Servidor rodando na porta ${port}`);
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
