@@ -6,7 +6,6 @@ const app = express();
 
 require('dotenv').config();
 
-
 app.use(cors());
 app.use(express.json());
 
@@ -14,96 +13,111 @@ const saltRounds = 10;
 
 // Configurar conexão com o banco de dados usando variáveis de ambiente
 const dbConfig = {
-  host: process.env.DB_HOST,         // [AJUSTAR]
-  user: process.env.DB_USER,         // [AJUSTAR]
-  password: process.env.DB_PASSWORD, // [AJUSTAR]
-  database: process.env.DB_NAME,     // [AJUSTAR]
+  host: '35.223.48.38',
+  user: 'root',
+  password: '{GFNqk]rFh/sM#y(',
+  database: 'jurassic_db',
 };
+
+let connection; // Declare a variável connection aqui
 
 // Função para criar conexão com o banco de dados
 async function createConnection() {
-  return await mysql.createConnection(dbConfig);
+  try {
+    connection = await mysql.createConnection(dbConfig);
+    console.log('Conexão bem-sucedida ao banco de dados');
+  } catch (error) {
+    console.error('Erro ao conectar ao banco de dados:', error);
+    throw error;
+  }
 }
 
-// Usar bcrypt para gerar o hash da senha
-const mockUser = {
-  username: process.env.USER,
-  password: process.env.PASSWORD
-};
+// Rota para obter todos os produtos
+app.get('/api/produtos', async (req, res) => {
+  try {
+    if (!connection) {
+      await createConnection();
+    }
+
+    const query = 'SELECT * FROM products';
+    const [results] = await connection.query(query);
+    res.json(results);
+  } catch (error) {
+    console.error('Erro ao obter produtos do MySQL:', error);
+    res.status(500).json({ error: 'Erro ao obter produtos' });
+  }
+});
 
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
 
-  // Comparar a senha fornecida com o hash armazenado
   try {
-    const connection = await createConnection();
+    if (!connection) {
+      await createConnection();
+    }
+
     const [results] = await connection.execute('SELECT passwordHash FROM users WHERE username = ?', [username]);
-    const storedHash = results[0].passwordHash;
 
-    bcrypt.compare(password, storedHash, (err, result) => {
-      if (err) {
-        console.error('Erro ao comparar senha e hash:', err);
-        res.status(500).json({ error: 'Erro ao comparar senha' });
-        return;
-      }
+    if (results.length > 0) {
+      const storedHash = results[0].passwordHash;
 
-      if (result) {
-        res.json({ success: true });
-      } else {
-        res.status(401).json({ success: false, error: "Unauthorized" });
-      }
-    });
+      bcrypt.compare(password, storedHash, (err, result) => {
+        if (err) {
+          console.error('Erro ao comparar senha e hash:', err);
+          res.status(500).json({ error: 'Erro ao comparar senha' });
+          return;
+        }
+
+        if (result) {
+          res.json({ success: true });
+        } else {
+          res.status(401).json({ success: false, error: "Unauthorized" });
+        }
+      });
+    } else {
+      res.status(401).json({ success: false, error: "Unauthorized" });
+    }
   } catch (error) {
     console.error('Erro ao conectar ao banco de dados:', error);
     res.status(500).json({ error: 'Erro ao conectar ao banco de dados' });
   }
 });
-// Rota para obter todos os produtos
-app.get('/api/produtos', (req, res) => {
-  const query = 'SELECT * FROM products';
-
-  connection.query(query, (err, results) => {
-    if (err) {
-      console.error('Erro ao obter produtos do MySQL:', err);
-      res.status(500).json({ error: 'Erro ao obter produtos' });
-    } else {
-      res.json(results);
-    }
-  });
-});
 
 // Rota para obter todas as categorias
-app.get('/api/categorias', (req, res) => {
-  const query = 'SELECT * FROM categorias';
-
-  connection.query(query, (err, results) => {
-    if (err) {
-      console.error('Erro ao obter categorias do MySQL:', err);
-      res.status(500).json({ error: 'Erro ao obter categorias' });
-    } else {
-      res.json(results);
+app.get('/api/categorias', async (req, res) => {
+  try {
+    if (!connection) {
+      await createConnection();
     }
-  });
+
+    const query = 'SELECT * FROM categorias';
+    const [results] = await connection.query(query);
+    res.json(results);
+  } catch (error) {
+    console.error('Erro ao obter categorias do MySQL:', error);
+    res.status(500).json({ error: 'Erro ao obter categorias' });
+  }
 });
 
-// Rota para obter detalhes de um produto específico
-app.get('/api/produtos/:id', (req, res) => {
-  const productId = req.params.id;
-  const query = 'SELECT * FROM products WHERE id = ?';
 
-  connection.query(query, [productId], (err, results) => {
-    if (err) {
-      console.error('Erro ao obter detalhes do produto do MySQL:', err);
-      res.status(500).json({ error: 'Erro ao obter detalhes do produto' });
+
+app.get('/api/produtos/:id', async (req, res) => {
+  try {
+    await createConnection();
+    const productId = req.params.id;
+    const query = 'SELECT * FROM products WHERE id = ?';
+    const [results] = await connection.execute(query, [productId]);
+    if (results.length > 0) {
+      res.json(results[0]);
     } else {
-      if (results.length > 0) {
-        res.json(results[0]); // Retorna apenas o primeiro resultado (o produto específico)
-      } else {
-        res.status(404).json({ error: 'Produto não encontrado' });
-      }
+      res.status(404).json({ error: 'Produto não encontrado' });
     }
-  });
+  } catch (error) {
+    console.error('Erro ao obter detalhes do produto do MySQL:', error);
+    res.status(500).json({ error: 'Erro ao obter detalhes do produto' });
+  }
 });
+
 
 // Rota para adicionar um novo produto
 app.post('/api/produtos-add', async (req, res) => {
